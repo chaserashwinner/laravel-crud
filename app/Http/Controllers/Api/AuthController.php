@@ -1,45 +1,59 @@
 <?php
 
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
-    {
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|min:6',
+    ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+    $user = User::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => Hash::make($validated['password']),
+    ]);
 
-        return response()->json([
-            'token' => $token,
-            'user' => $user,
-        ]);
-    }
+    $token = $user->createToken('api-token')->plainTextToken;
+
+    return response()->json([
+        'user' => $user,
+        'token' => $token,
+    ], 201);
+}
 
     public function login(Request $request)
-    {
-        $user = User::where('email', $request->email)->first();
+{
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
-
-        $token = $user->createToken('api-token')->plainTextToken;
-
+    if (!Auth::attempt($credentials)) {
         return response()->json([
-            'token' => $token,
-            'user' => $user,
-        ]);
+            'message' => 'Invalid credentials'
+        ], 401);
     }
+
+    $user = Auth::user();
+    $token = $user->createToken('api-token')->plainTextToken;
+
+    return response()->json([
+        'user' => $user,
+        'token' => $token,
+    ]);
+}
 
     public function logout(Request $request)
     {
